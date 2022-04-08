@@ -9,7 +9,7 @@ nRows = numRows
 nCols = numColumns
 tau = Transmission Rate
 **/
-bool infect(int Pop[][], int i, int j, float tau, int nRows){
+bool infect(int Pop[][], int i, int j, float tau, int nRows, nCols){
     //Tracks whether current cell has been infected
     bool t = 0;
     //if not the leftmost wall
@@ -20,7 +20,7 @@ bool infect(int Pop[][], int i, int j, float tau, int nRows){
         }
     }
     //if i is not the rightmost wall
-    if(i < n) {
+    if(i < nRows) {
         //if left neighbor is sick
         if(Pop[i+1][j] > 0){
             t = t + (rand < tau);
@@ -32,7 +32,7 @@ bool infect(int Pop[][], int i, int j, float tau, int nRows){
             t = t + (rand < tau);
         }
     }
-    if(j < n) {
+    if(j < nCols) {
         //if left neighbor is sick
         if(Pop[i+1][j] > 0){
             t = t + (rand < tau);
@@ -41,5 +41,6 @@ bool infect(int Pop[][], int i, int j, float tau, int nRows){
     int p = 0;
     if(t > 0){
         p = 1;
+        return p;
     }
 }
