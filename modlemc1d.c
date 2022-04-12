@@ -29,7 +29,7 @@ int assert_minimum_value(char which_value[16], int actual_value, int expected_va
 void pluralize_value_if_needed(int value); 
 void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
-void spread_infection(int **pop, int **npop, int n, int k, int tau);
+void spread_infection(int **pop, int **npop, int n, int k, float tau);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols);
 
 
@@ -62,7 +62,6 @@ int main(int argc, char **argv) {
   if (return_value != 0) {
     exit(-1);
   }
-
   
   pop = (int**)malloc(n * n * sizeof(int));
   npop = (int**)malloc(n * n * sizeof(int));
@@ -74,9 +73,12 @@ int main(int argc, char **argv) {
   initialize_grid(pop, n);
   initialize_grid(npop, n);
   spread_infection(pop, npop, n, k, tau);
+
+  free(pop);
+  free(npop);
 }
 
-void spread_infection(int **pop, int **npop, int n, int k, int tau) {
+void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   int t, i, j, new;
   
   int ninfected = 1;
@@ -86,9 +88,10 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
   t = 0;
 
   int a = 0;
-  while (a++ < 5) {
-    printGrid(pop, n);
+  printGrid(pop, n);
+  while (a++ < 3) {
     t = t + 1;
+
     
     for (i = 0; i < n; i ++) {
 
@@ -100,6 +103,7 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
 
           if (new > k) {
             new = -1;
+            ninfected--;
           }
 
         }
@@ -107,20 +111,20 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
         else {
           if (new == 0) {
             new = infect(pop, i, j, tau, n, n);
-            if (new == 1) {
-              ninfected++;
-            }
+            ninfected;
           }
         }
 
         npop[i][j] = new;
 
       }
+
+
     }
-
     pop = npop;
-
+    printGrid(pop, n);
   } 
+
 }
 
 /**
@@ -138,8 +142,6 @@ bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
 
     float rand = .01;
     int temp = rand < tau;
-
-    printf("rand = %f, tau = %f, rand < tau = %d\n", rand, tau, t);
     
     //Tracks whether current cell has been infected
     int t = 0;
@@ -177,7 +179,7 @@ bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
     
     if(t > 0){
         p = 1;
-    }
+     }
 
     return p;
 
