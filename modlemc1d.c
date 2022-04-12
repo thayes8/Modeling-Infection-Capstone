@@ -87,8 +87,8 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
 
   int a = 0;
   while (a++ < 5) {
-    t = t + 1;
     printGrid(pop, n);
+    t = t + 1;
     
     for (i = 0; i < n; i ++) {
 
@@ -106,7 +106,7 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
 
         else {
           if (new == 0) {
-            new = infect(pop, i, j, n, n, tau);
+            new = infect(pop, i, j, tau, n, n);
             if (new == 1) {
               ninfected++;
             }
@@ -119,8 +119,6 @@ void spread_infection(int **pop, int **npop, int n, int k, int tau) {
     }
 
     pop = npop;
-
-
 
   } 
 }
@@ -137,42 +135,46 @@ nCols = numColumns
 tau = Transmission Rate
 **/
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
-    
-    float rand = .2;
+
+    float rand = .01;
+    int temp = rand < tau;
+
+    printf("rand = %f, tau = %f, rand < tau = %d\n", rand, tau, t);
     
     //Tracks whether current cell has been infected
-    int t = 1;
+    int t = 0;
 
     //if not the leftmost wall
-    if(i > 1) {
+    if(i > 0) {
         //if left neighbor is sick
         if(pop[i-1][j] > 0){
             t = (rand < tau);
         }
     }
     //if i is not the rightmost wall
-    if(i < nRows - 2) {
+    if(i < nRows - 1) {
         //if left neighbor is sick
         if(pop[i+1][j] > 0){
             t = t + (rand < tau);
         }
     }
-    if(j > 1) {
+
+    if(j > 0) {
         //if left neighbor is sick
         if(pop[i][j-1] > 0){
             t = t + (rand < tau);
         }
     }
-    if(j < nCols - 2) {
-        //if left neighbor is sick
-        if(pop[i+1][j] > 0){
+
+    if(j < nCols - 1) {
+      
+        if(pop[i][j+1] > 0){
             t = t + (rand < tau);
         }
     }
 
-
-
     bool p = 0;
+    
     if(t > 0){
         p = 1;
     }
@@ -267,4 +269,5 @@ void printGrid(int **pop, int n) {
 
     printf("\n");
   }
+  printf("\n");
 }
