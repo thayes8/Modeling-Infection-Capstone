@@ -1,9 +1,8 @@
-TARGETS = modldemc1d.c
 
-all: $(TARGETS)
+all: modlemc1d
 
-modldemc1d: modldemc1d.c
-	gcc -o modldemc1d modldemc1d.c
+modldemc1d: modldemc1d.c infect.c
+	gcc -o modldemc1d modldemc1d.c infect.c
 
 clean:
-	rm -f $(TARGETS)
+	rm -f modlemc1d

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 /********************************************
  * Need at least this many rows and columns *
@@ -27,13 +28,16 @@ void getArguments(int argc, char *argv[], int *n, int *k, float *tau);
 int assert_minimum_value(char which_value[16], int actual_value, int expected_value);
 void pluralize_value_if_needed(int value); 
 void printGrid(int **our_pop, int n);
+void initialize_grid(int **grid, int n);
+void spread_infection(int **pop, int **npop, int n, int k, int tau);
+bool infect(int **pop, int i, int j, float tau, int nRows, int nCols);
 
 
 int main(int argc, char **argv) {
   
   // default value updated by command line argument
   int n = 5;
-  int k = 1;
+  int k = 5;
   float tau = .1;
 
   // for checking if n, k, tau are sensible
@@ -43,7 +47,7 @@ int main(int argc, char **argv) {
   int **pop, **npop;
 
   // loop variables
-  int i, j, new, t, ninfected;
+  int row;
   
   // get command line arguments
   getArguments(argc, argv, &n, &k, &tau);
@@ -59,21 +63,38 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
+  
   pop = (int**)malloc(n * n * sizeof(int));
+  npop = (int**)malloc(n * n * sizeof(int));
+  for (row = 0; row < n; row ++) {
+    pop[row] = (int*)malloc(n * sizeof(int));
+    npop[row] = (int*)malloc(n * sizeof(int));
+  }
 
-  pop[1][2] = 1; // set first patient to infected (probably change to random nums later?)
-  ninfected = 1;
+  initialize_grid(pop, n);
+  initialize_grid(npop, n);
+  spread_infection(pop, npop, n, k, tau);
+}
+
+void spread_infection(int **pop, int **npop, int n, int k, int tau) {
+  int t, i, j, new;
+  
+  int ninfected = 1;
+
+  pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
 
   t = 0;
 
-  while (ninfected > 0) {
+  int a = 0;
+  while (a++ < 5) {
     t = t + 1;
+    printGrid(pop, n);
     
     for (i = 0; i < n; i ++) {
 
       for (j = 0; j < n; j++) {
+        
         new = pop[i][j];
-
         if (new > 0) {
           new = new + 1;
 
@@ -93,10 +114,81 @@ int main(int argc, char **argv) {
         }
 
         npop[i][j] = new;
+
       }
     }
 
     pop = npop;
+
+
+
+  } 
+}
+
+/**
+Looks at all of a current cell's neighbors and gets a random num for each
+infected neighbor and generates a random num from 0 to 1, then compares that
+num to the infection rate to determine if it gets infected.
+Variable Definitions:
+i = current x pos
+j = current y pos
+nRows = numRows
+nCols = numColumns
+tau = Transmission Rate
+**/
+bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
+    
+    float rand = .2;
+    
+    //Tracks whether current cell has been infected
+    int t = 1;
+
+    //if not the leftmost wall
+    if(i > 1) {
+        //if left neighbor is sick
+        if(pop[i-1][j] > 0){
+            t = (rand < tau);
+        }
+    }
+    //if i is not the rightmost wall
+    if(i < nRows - 2) {
+        //if left neighbor is sick
+        if(pop[i+1][j] > 0){
+            t = t + (rand < tau);
+        }
+    }
+    if(j > 1) {
+        //if left neighbor is sick
+        if(pop[i][j-1] > 0){
+            t = t + (rand < tau);
+        }
+    }
+    if(j < nCols - 2) {
+        //if left neighbor is sick
+        if(pop[i+1][j] > 0){
+            t = t + (rand < tau);
+        }
+    }
+
+
+
+    bool p = 0;
+    if(t > 0){
+        p = 1;
+    }
+
+    return p;
+
+}
+
+void initialize_grid(int **grid, int n) {
+  int row;
+  int column;
+
+  for (row = 0; row < n; row ++) {
+    for (column = 0; column < n; column++) {
+      grid[row][column] = 0;
+    }
   }
 }
 
