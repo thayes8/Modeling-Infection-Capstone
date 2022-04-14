@@ -16,6 +16,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <iostream>
+#include <fstream>
+
+#include <trng/mt19937_64.hpp>
+#include <trng/mt19937.hpp>
+#include <trng/lcg64_shift.hpp>
+#include <trng/normal_dist.hpp>
+#include <trng/uniform_dist.hpp>
+#include <trng/exponential_dist.hpp>
 
 /********************************************
  * Need at least this many rows and columns *
@@ -32,8 +41,17 @@ void initialize_grid(int **grid, int n);
 void spread_infection(int **pop, int **npop, int n, int k, float tau);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols);
 
-
+using namespace std;
 int main(int argc, char **argv) {
+
+  trng::mt19937_64 RNengine1;
+  trng::uniform_dist<> uni(0, 1);
+
+  float rand = uni(RNengine1);
+  float rand2 = uni(RNengine1);
+
+  printf("rand = %f, rand2 = %f\n", rand, rand2);
+
   
   // default value updated by command line argument
   int n = 5;
@@ -48,6 +66,8 @@ int main(int argc, char **argv) {
 
   // loop variables
   int row;
+
+  // set random engine
   
   // get command line arguments
   getArguments(argc, argv, &n, &k, &tau);
@@ -79,7 +99,7 @@ int main(int argc, char **argv) {
 }
 
 void spread_infection(int **pop, int **npop, int n, int k, float tau) {
-  int t, i, j, new;
+  int t, i, j, new_value;
   
   int ninfected = 1;
 
@@ -92,36 +112,43 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   while (a++ < 3) {
     t = t + 1;
 
-    
     for (i = 0; i < n; i ++) {
 
       for (j = 0; j < n; j++) {
         
-        new = pop[i][j];
-        if (new > 0) {
-          new = new + 1;
+        new_value = pop[i][j];
+        if (new_value > 0) {
+          new_value = new_value + 1;
 
-          if (new > k) {
-            new = -1;
+          if (new_value > k) {
+            new_value = -1;
             ninfected--;
           }
 
         }
 
         else {
-          if (new == 0) {
-            new = infect(pop, i, j, tau, n, n);
+          if (new_value == 0) {
+            new_value = infect(pop, i, j, tau, n, n);
             ninfected;
           }
         }
 
-        npop[i][j] = new;
+        npop[i][j] = new_value;
 
       }
 
 
     }
-    pop = npop;
+
+    for (i = 0; i < n; i ++) {
+
+      for (j = 0; j < n; j++) {
+
+        pop[i][j] = npop[i][j];
+
+      }
+    }
     printGrid(pop, n);
   } 
 
@@ -139,10 +166,12 @@ nCols = numColumns
 tau = Transmission Rate
 **/
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
+    trng::mt19937_64 RNengine1;
+    trng::uniform_dist<> uni(0, 1);
 
-    float rand = .01;
-    int temp = rand < tau;
-    
+    float rand = uni(RNengine1);
+    printf("rand = %f", rand);
+
     //Tracks whether current cell has been infected
     int t = 0;
 
@@ -179,8 +208,8 @@ bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
     
     if(t > 0){
         p = 1;
-     }
-
+    }
+    
     return p;
 
 }
