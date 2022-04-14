@@ -1,8 +1,13 @@
+CXX=g++
+INCLUDE=/usr/local/include/trng
+LIB=trng4
+TARGET=modlemc
 
-all: modlemc1d
+all: $(TARGET)
 
-modldemc1d: modldemc1d.c infect.c
-	gcc -o modldemc1d modldemc1d.c infect.c
+$(TARGET): modlemc.cpp
+	$(CXX) -o $(TARGET) modlemc.cpp -I$(INCLUDE) -l$(LIB)
 
+######### clean
 clean:
-	rm -f modlemc1d
+	rm -f $(TARGET)
