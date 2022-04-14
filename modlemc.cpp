@@ -39,7 +39,7 @@ void pluralize_value_if_needed(int value);
 void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
 void spread_infection(int **pop, int **npop, int n, int k, float tau);
-bool infect(int **pop, int i, int j, float tau, int nRows, int nCols);
+bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
 
 using namespace std;
 int main(int argc, char **argv) {
@@ -102,6 +102,8 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   int t, i, j, new_value;
   
   int ninfected = 1;
+  trng::mt19937_64 RNengine1;
+    trng::uniform_dist<> uni(0, 1);
 
   pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
 
@@ -129,7 +131,8 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            new_value = infect(pop, i, j, tau, n, n);
+            float rand = uni(RNengine1);
+            new_value = infect(pop, i, j, tau, n, n, rand);
             ninfected;
           }
         }
@@ -165,11 +168,7 @@ nRows = numRows
 nCols = numColumns
 tau = Transmission Rate
 **/
-bool infect(int **pop, int i, int j, float tau, int nRows, int nCols){
-    trng::mt19937_64 RNengine1;
-    trng::uniform_dist<> uni(0, 1);
-
-    float rand = uni(RNengine1);
+bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand){
     printf("rand = %f", rand);
 
     //Tracks whether current cell has been infected
