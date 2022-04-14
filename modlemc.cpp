@@ -38,9 +38,10 @@ int assert_minimum_value(char which_value[16], int actual_value, int expected_va
 void pluralize_value_if_needed(int value); 
 void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
-void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu);
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, float delta);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
 void vaccinate(int **npop, int i, int j, float rand, float nu);
+void newPosition(int** npop, int i, int j, float delta, int n, float rand);
 
 using namespace std;
 int main(int argc, char **argv) {
@@ -50,7 +51,8 @@ int main(int argc, char **argv) {
   int n = 5;
   int k = 5;
   float tau = .1;
-  float nu = .1;
+  float nu = 0;
+  float delta = .1;
 
   // for checking if n, k, tau are sensible
   int return_value;
@@ -86,13 +88,13 @@ int main(int argc, char **argv) {
 
   initialize_grid(pop, n);
   initialize_grid(npop, n);
-  spread_infection(pop, npop, n, k, tau, nu);
+  spread_infection(pop, npop, n, k, tau, nu, delta);
 
   free(pop);
   free(npop);
 }
 
-void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu) {
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, float delta) {
   int t, i, j, new_value;
   
   int ninfected = 1;
@@ -103,9 +105,9 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu) 
 
   t = 0;
 
-  int a = 0;
   printGrid(pop, n);
-  while (a++ < 3) {
+  int a = 0;
+  while (a++ < 10) {
     t = t + 1;
 
     for (i = 0; i < n; i ++) {
@@ -118,39 +120,58 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu) 
 
           if (new_value > k) {
             new_value = -1;
-            ninfected--;
           }
-
         }
 
         else {
           if (new_value == 0) {
             float rand = uni(RNengine1);
             new_value = infect(pop, i, j, tau, n, n, rand);
-            ninfected;
+
           }
         }
 
         npop[i][j] = new_value;
         float rand2 = uni(RNengine1);
         vaccinate(npop, i, j, rand2, nu);
-
+        float rand3 = uni(RNengine1); 
+        newPosition(npop, i, j, delta, n, rand3);
+        printf("ninfected = %d\n", ninfected);
       }
 
 
     }
+
+    ninfected = 0;
 
     for (i = 0; i < n; i ++) {
 
       for (j = 0; j < n; j++) {
 
         pop[i][j] = npop[i][j];
-
+        
+        if(npop[i][j] > 0) {
+          ninfected++;
+        }
       }
     }
+
     printGrid(pop, n);
   } 
 
+
+}
+
+void newPosition(int** npop, int i, int j, float delta, int n, float rand){
+  if(delta > 0){
+    if(rand<delta){
+        int inew = floor(rand*n+1);
+        int jnew = floor(rand*n+1);
+        int tt = npop[i][j];
+        npop[i][j] = npop[inew][jnew];
+        npop[inew][jnew] = tt;
+    }
+  }
 }
 
 
