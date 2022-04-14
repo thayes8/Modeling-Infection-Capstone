@@ -33,30 +33,24 @@ const int MINIMUM_DIMENSION = 1;
 const int MINIMUM_K = 0;
 const int MINIMUM_TAU = 0;
 
-void getArguments(int argc, char *argv[], int *n, int *k, float *tau);
+void getArguments(int argc, char *argv[], int *n, int *k, float *tau, float *nu);
 int assert_minimum_value(char which_value[16], int actual_value, int expected_value);
 void pluralize_value_if_needed(int value); 
 void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
-void spread_infection(int **pop, int **npop, int n, int k, float tau);
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
+void vaccinate(int **npop, int i, int j, float rand, float nu);
 
 using namespace std;
 int main(int argc, char **argv) {
-
-  trng::mt19937_64 RNengine1;
-  trng::uniform_dist<> uni(0, 1);
-
-  float rand = uni(RNengine1);
-  float rand2 = uni(RNengine1);
-
-  printf("rand = %f, rand2 = %f\n", rand, rand2);
 
   
   // default value updated by command line argument
   int n = 5;
   int k = 5;
   float tau = .1;
+  float nu = .1;
 
   // for checking if n, k, tau are sensible
   int return_value;
@@ -70,7 +64,7 @@ int main(int argc, char **argv) {
   // set random engine
   
   // get command line arguments
-  getArguments(argc, argv, &n, &k, &tau);
+  getArguments(argc, argv, &n, &k, &tau, &nu);
 
   // make sure dimension is not <= 0
   return_value = assert_minimum_value("n", n, MINIMUM_DIMENSION);
@@ -92,18 +86,18 @@ int main(int argc, char **argv) {
 
   initialize_grid(pop, n);
   initialize_grid(npop, n);
-  spread_infection(pop, npop, n, k, tau);
+  spread_infection(pop, npop, n, k, tau, nu);
 
   free(pop);
   free(npop);
 }
 
-void spread_infection(int **pop, int **npop, int n, int k, float tau) {
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu) {
   int t, i, j, new_value;
   
   int ninfected = 1;
   trng::mt19937_64 RNengine1;
-    trng::uniform_dist<> uni(0, 1);
+  trng::uniform_dist<> uni(0, 1);
 
   pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
 
@@ -138,6 +132,8 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
         }
 
         npop[i][j] = new_value;
+        float rand2 = uni(RNengine1);
+        vaccinate(npop, i, j, rand2, nu);
 
       }
 
@@ -157,6 +153,14 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
 }
 
+
+void vaccinate(int **npop, int i, int j, float rand, float nu) {
+  if (npop[i][j] == 0 && rand < nu) {
+    npop[i][j] = -2;
+  }
+}
+
+
 /**
 Looks at all of a current cell's neighbors and gets a random num for each
 infected neighbor and generates a random num from 0 to 1, then compares that
@@ -169,7 +173,6 @@ nCols = numColumns
 tau = Transmission Rate
 **/
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand){
-    printf("rand = %f", rand);
 
     //Tracks whether current cell has been infected
     int t = 0;
@@ -225,11 +228,11 @@ void initialize_grid(int **grid, int n) {
 }
 
 
-void getArguments(int argc, char *argv[], int *n, int *k, float *tau) {
-  char *nvalue, *kvalue, *tvalue;
+void getArguments(int argc, char *argv[], int *n, int *k, float *tau, float *nu) {
+  char *nvalue, *kvalue, *tvalue, *vvalue;
   int c;    // result from getopt calls
 
-  while ((c = getopt(argc, argv, "n:k:t:")) != -1) {
+  while ((c = getopt(argc, argv, "n:k:t:v:")) != -1) {
     switch (c) {
       case 'n':
         nvalue = optarg;
@@ -243,9 +246,12 @@ void getArguments(int argc, char *argv[], int *n, int *k, float *tau) {
         tvalue = optarg;
         *tau = atof(tvalue);
         break;
+      case 'v':
+        vvalue = optarg;
+        *nu = atof(tvalue);
       case '?':
       default:
-        fprintf(stderr, "Usage %s [-n dimension of grid] [-k number of days in contagion] [-t transmissablitiy rate]\n", argv[0]);
+        fprintf(stderr, "Usage %s [-n dimension of grid] [-k number of days in contagion] [-t transmissablitiy rate] [-v vaccination rate]\n", argv[0]);
         
         exit(-1);  
     }
@@ -293,7 +299,7 @@ void printGrid(int **pop, int n) {
 
     for (current_column = 0; current_column < n; current_column ++) {
       
-      printf("%d", pop[current_row][current_column]);
+      printf("  %d  ", pop[current_row][current_column]);
 
     }
 
