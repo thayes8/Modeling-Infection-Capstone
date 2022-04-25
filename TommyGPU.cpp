@@ -104,6 +104,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   int t, i, j, new_value;
   
   int ninfected = 1;
+  
   int randNumArray[][][] = fillRandNumArray(n, 3);
 
   pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
@@ -135,7 +136,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            float rand = .5;
+            float rand = randNumArray[i][j][a];
             new_value = infect(pop, i, j, tau, n, n, rand);
             ninfected++;
           }
@@ -314,7 +315,7 @@ void printGrid(int **pop, int n) {
 int*** fillRandNumArray(int n, int timesteps){
   trng::mt19937_64 RNengine1;
   trng::uniform_dist<> uni(0, 1);
-  int randArray[n][n][timesteps] = malloc(); //finish
+  int randArray[n][n][timesteps] = (int***)malloc(n * n * timesteps * sizeof(int));
   #pragma omp parallel for
   for(int i = 0; i < n; i++){
     for(int j = 0; j<n; j++){
