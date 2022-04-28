@@ -41,7 +41,7 @@ void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
 void spread_infection(int **pop, int **npop, int n, int k, float tau);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
-int* fillRandNumArray(int n, int timesteps);
+float* fillRandNumArray(int n, int timesteps);
 
 using namespace std;
 int main(int argc, char **argv) {
@@ -107,8 +107,9 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   
   int ninfected = 1;
   
-  int *randNumArray;
-  randNumArray = fillRandNumArray(n, 3);
+  float *randNumArray;
+  //!!!Must change second value when changing the while loop "a"
+  randNumArray = fillRandNumArray(n, 6);
 
   pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
 
@@ -116,7 +117,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
   int a = 0;
   printGrid(pop, n);
-  while (a++ < 3) {
+  while (a++ < 6) {
     t = t + 1;
     //Start Parallelization
     //Lets make the grid count in the millions so that we can actually parallelize
@@ -314,16 +315,16 @@ void printGrid(int **pop, int n) {
 
 //GPU needs premade array with all random numbers for all timesteps
 //could parallelize with openMP or MPI if trng works with those.
-int* fillRandNumArray(int n, int timesteps){
+float* fillRandNumArray(int n, int timesteps){
   trng::mt19937_64 RNengine1;
   trng::uniform_dist<> uni(0, 1);
-  int *randArray;
-  randArray = (int*) malloc(n * n * timesteps * sizeof(int));
+  float *randArray;
+  randArray = (float*) malloc(n * n * timesteps * sizeof(float));
   #pragma omp parallel for
   for(int i = 0; i < n; i++){
     for(int j = 0; j<n; j++){
       for(int t = 0; t<timesteps; t++){
-        randArray[(i+j)+(timesteps-1)*n*n] = uni(RNengine1);
+        randArray[i+j+t*n*n] = uni(RNengine1);
       }
     }
   }
