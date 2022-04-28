@@ -17,4 +17,4 @@ GPUmodle: TommyGPU.cpp
 
 ######### clean
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) GPUmodle
