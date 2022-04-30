@@ -133,16 +133,14 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
   t = 0;
 
-  int a = 0;
   printGrid(pop, n);
-  while (a++ < 20) {
+  while (ninfected >0) {
+    t = t + 1;
     stream = acc_get_cuda_stream(acc_async_sync);
     #pragma acc host_data use_device(arrayRN)
     {
         gen_rand_nums(cuda_gen, arrayRN, length*20, stream);
     }
-
-    t = t + 1;
     //Start Parallelization
     //Lets make the grid count in the millions so that we can actually parallelize
     #pragma acc kernels
@@ -164,10 +162,13 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            rando = arrayRN[i*n+j+(a-1)*n*n];
+            rando = arrayRN[i*n+j+(t-1)*n*n];
             //printf("%f\n", rand);
             new_value = infect(pop, i, j, tau, n, n, rando);
-            ninfected++;
+            if(new_value == 1){
+              ninfected++;
+            }
+            
           }
         }
 
