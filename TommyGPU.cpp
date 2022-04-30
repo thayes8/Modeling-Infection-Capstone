@@ -27,6 +27,11 @@
 #include <trng/exponential_dist.hpp>
 #include <trng/uniform01_dist.hpp>
 
+#include "openacc.h"
+#include "fillRand.cu"
+#include <curand.h>
+#include <time.h>
+
 /********************************************
  * Need at least this many rows and columns *
  ********************************************/
@@ -43,6 +48,11 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
 float* fillRandNumArray(int n, int timesteps);
 
+
+curandGenerator_t setup_prng(void *stream, unsigned long long seed);
+void gen_rand_nums(curandGenerator_t gen, float *d_buffer, int num, void *stream);
+void rand_cleanup( curandGenerator_t gen );
+
 using namespace std;
 int main(int argc, char **argv) {
   //Change to one big array with number of cells times # of iterations
@@ -54,10 +64,9 @@ int main(int argc, char **argv) {
   // float rand2 = uni(RNengine1);
 
   // printf("rand = %f, rand2 = %f\n", rand, rand2);
-
   
   // default value updated by command line argument
-  int n = 5;
+  int n = 10;
   int k = 5;
   float tau = .1;
 
@@ -104,20 +113,35 @@ int main(int argc, char **argv) {
 void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   int t, i, j, new_value;
   float rand;
-  
+
+  void *stream = acc_get_cuda_stream(acc_async_sync);
+    int length = (n)*(n);
+    curandGenerator_t cuda_gen;
+    float *restrict arrayRN = (float*)malloc(2*length*sizeof(float));
+
+    // use CUDA library functions to initialize a generator
+    unsigned long long seed = time(NULL);
+    cuda_gen = setup_prng(stream, seed);
   int ninfected = 1;
-  
-  float *randNumArray;
-  //!!!Must change second value when changing the while loop "a"
-  randNumArray = fillRandNumArray(n, 6);
+
+  //!!!Must change timestep value (constant) when changing the while loop "a"
+  //float *randArray;
+  //randArray = fillRandNumArray(n, 6);
+
 
   pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
 
   t = 0;
 
   int a = 0;
-  printGrid(pop, n);
-  while (a++ < 6) {
+  //printGrid(pop, n);
+  while (a++ < 2) {
+    stream = acc_get_cuda_stream(acc_async_sync);
+    #pragma acc host_data use_device(arrayRN)
+    {
+        gen_rand_nums(cuda_gen, arrayRN, length*2, stream);
+    }
+
     t = t + 1;
     //Start Parallelization
     //Lets make the grid count in the millions so that we can actually parallelize
@@ -125,6 +149,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
     #pragma acc loop independent
     for (i = 0; i < n; i ++) {
       #pragma acc loop independent private(new_value, i, j, rand) reduction(+:ninfected)
+      //#pragma acc data copyin(randArray)
       for (j = 0; j < n; j++) {
         new_value = pop[i][j];
         if (new_value > 0) {
@@ -139,7 +164,8 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            rand = randNumArray[(i+j)+(a-1)*n*n];
+            rand = arrayRN[i*n+j+(a-1)*n*n];
+            printf("%f\n", rand);
             new_value = infect(pop, i, j, tau, n, n, rand);
             ninfected++;
           }
@@ -151,6 +177,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
 
     }
+    
     #pragma acc kernels
     #pragma acc loop independent
     for (i = 0; i < n; i ++) {
@@ -161,9 +188,9 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
       }
     }
-    printGrid(pop, n);
+    //printGrid(pop, n);
   } 
-
+  rand_cleanup(cuda_gen);
 }
 
 /**
@@ -180,7 +207,7 @@ tau = Transmission Rate
 Not Parallelizable
 **/
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand){
-    printf("rand = %f", rand);
+    //printf("rand = %f", rand);
 
     //Tracks whether current cell has been infected
     int t = 0;
@@ -315,18 +342,38 @@ void printGrid(int **pop, int n) {
 
 //GPU needs premade array with all random numbers for all timesteps
 //could parallelize with openMP or MPI if trng works with those.
-float* fillRandNumArray(int n, int timesteps){
-  trng::mt19937_64 RNengine1;
-  trng::uniform_dist<> uni(0, 1);
-  float *randArray;
-  randArray = (float*) malloc(n * n * timesteps * sizeof(float));
-  #pragma omp parallel for
-  for(int i = 0; i < n; i++){
-    for(int j = 0; j<n; j++){
-      for(int t = 0; t<timesteps; t++){
-        randArray[i+j+t*n*n] = uni(RNengine1);
-      }
-    }
-  }
-  return randArray;
-}
+// float* fillRandNumArray(int n, int timesteps){
+//   trng::mt19937_64 RNengine1;
+//   trng::uniform_dist<> uni(0, 1);
+//   float *randArray;
+//   randArray = (float*) malloc(n * n * timesteps * sizeof(float));
+//   #pragma omp parallel for
+//   for(int t = 0; t<timesteps; t++){
+//     //fix i=0 j=1 is the same spot as i=1 j=0
+//     for(int i = 0; i<n; i++){
+//       for(int j = 0; j < n; j++){
+//           randArray[j+i*n+t*n*n] = uni(RNengine1);
+//       }
+//     }
+//   }
+//   // printf("%f\n", randArray[0]);
+//   // printf("%f\n", randArray[6]);
+//   // printf("%f\n", randArray[12]);
+//   //   printf("%f\n", randArray[13]);
+//   //     printf("%f\n", randArray[14]);
+//   //       printf("%f\n", randArray[15]);
+//   //         printf("%f\n", randArray[16]);
+//   //           printf("%f\n", randArray[2]);
+//   //             printf("%f\n", randArray[3]);
+//   //               printf("%f\n", randArray[4]);
+//   //                 printf("%f\n", randArray[31]);
+
+//   // printf("%f\n", randArray[18]);
+//   // printf("%f\n", randArray[24]);
+//   // printf("%f\n", randArray[25]);
+//   // printf("%f\n", randArray[26]);
+//   // printf("%f\n", randArray[40]);
+//   // printf("%f\n", randArray[70]);
+//   return randArray;
+// }
+
