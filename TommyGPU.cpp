@@ -32,6 +32,7 @@
 #include <curand.h>
 #include <time.h>
 
+
 /********************************************
  * Need at least this many rows and columns *
  ********************************************/
@@ -112,34 +113,33 @@ int main(int argc, char **argv) {
 //Parallelize
 void spread_infection(int **pop, int **npop, int n, int k, float tau) {
   int t, i, j, new_value;
-  float rand;
+  float rando;
+
+  srand(time(0));
+  int rand1 = rand() % n;
+  int rand2 = rand() % n;
+  pop[rand1][rand2] = 1; // set first patient to infected (probably change to random nums later?
 
   void *stream = acc_get_cuda_stream(acc_async_sync);
     int length = (n)*(n);
     curandGenerator_t cuda_gen;
-    float *restrict arrayRN = (float*)malloc(2*length*sizeof(float));
+    //update constant for time loops
+    float *restrict arrayRN = (float*)malloc(20*length*sizeof(float));
 
     // use CUDA library functions to initialize a generator
     unsigned long long seed = time(NULL);
     cuda_gen = setup_prng(stream, seed);
   int ninfected = 1;
 
-  //!!!Must change timestep value (constant) when changing the while loop "a"
-  //float *randArray;
-  //randArray = fillRandNumArray(n, 6);
-
-
-  pop[1][2] = 1; // set first patient to infected (probably change to random nums later?
-
   t = 0;
 
   int a = 0;
-  //printGrid(pop, n);
-  while (a++ < 2) {
+  printGrid(pop, n);
+  while (a++ < 20) {
     stream = acc_get_cuda_stream(acc_async_sync);
     #pragma acc host_data use_device(arrayRN)
     {
-        gen_rand_nums(cuda_gen, arrayRN, length*2, stream);
+        gen_rand_nums(cuda_gen, arrayRN, length*20, stream);
     }
 
     t = t + 1;
@@ -148,7 +148,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
     #pragma acc kernels
     #pragma acc loop independent
     for (i = 0; i < n; i ++) {
-      #pragma acc loop independent private(new_value, i, j, rand) reduction(+:ninfected)
+      #pragma acc loop independent private(new_value, i, j, rando) reduction(+:ninfected)
       //#pragma acc data copyin(randArray)
       for (j = 0; j < n; j++) {
         new_value = pop[i][j];
@@ -164,9 +164,9 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            rand = arrayRN[i*n+j+(a-1)*n*n];
-            printf("%f\n", rand);
-            new_value = infect(pop, i, j, tau, n, n, rand);
+            rando = arrayRN[i*n+j+(a-1)*n*n];
+            //printf("%f\n", rand);
+            new_value = infect(pop, i, j, tau, n, n, rando);
             ninfected++;
           }
         }
@@ -188,7 +188,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
       }
     }
-    //printGrid(pop, n);
+    printGrid(pop, n);
   } 
   rand_cleanup(cuda_gen);
 }
