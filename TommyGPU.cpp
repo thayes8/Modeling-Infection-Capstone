@@ -40,14 +40,16 @@ const int MINIMUM_DIMENSION = 1;
 const int MINIMUM_K = 0;
 const int MINIMUM_TAU = 0;
 
-void getArguments(int argc, char *argv[], int *n, int *k, float *tau);
+void getArguments(int argc, char *argv[], int *n, int *k, float *tau, float *nu);
 int assert_minimum_value(char which_value[16], int actual_value, int expected_value);
 void pluralize_value_if_needed(int value); 
 void printGrid(int **our_pop, int n);
 void initialize_grid(int **grid, int n);
-void spread_infection(int **pop, int **npop, int n, int k, float tau);
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, float delta);
 bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand);
 float* fillRandNumArray(int n, int timesteps);
+void vaccinate(int **npop, int i, int j, float rand, float nu);
+void newPosition(int** npop, int i, int j, float delta, int n, float rand);
 
 
 curandGenerator_t setup_prng(void *stream, unsigned long long seed);
@@ -70,6 +72,8 @@ int main(int argc, char **argv) {
   int n = 10;
   int k = 5;
   float tau = .1;
+  float nu = .3;
+  float delta = .1;
 
   // for checking if n, k, tau are sensible
   int return_value;
@@ -83,7 +87,7 @@ int main(int argc, char **argv) {
   // set random engine
   
   // get command line arguments
-  getArguments(argc, argv, &n, &k, &tau);
+  getArguments(argc, argv, &n, &k, &tau, &nu);
 
   // make sure dimension is not <= 0
   return_value = assert_minimum_value("n", n, MINIMUM_DIMENSION);
@@ -105,16 +109,15 @@ int main(int argc, char **argv) {
 
   initialize_grid(pop, n);
   initialize_grid(npop, n);
-  spread_infection(pop, npop, n, k, tau);
+  spread_infection(pop, npop, n, k, tau, nu, delta);
 
   free(pop);
   free(npop);
 }
 //Parallelize
-void spread_infection(int **pop, int **npop, int n, int k, float tau) {
+void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, float delta) {
   int t, i, j, new_value;
-  float rando;
-
+  float rando, rand3, rand4;
   srand(time(0));
   int rand1 = rand() % n;
   int rand2 = rand() % n;
@@ -124,7 +127,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
     int length = (n)*(n);
     curandGenerator_t cuda_gen;
     //update constant for time loops
-    float *restrict arrayRN = (float*)malloc(20*length*sizeof(float));
+    float *restrict arrayRN = (float*)malloc(length*sizeof(float));
 
     // use CUDA library functions to initialize a generator
     unsigned long long seed = time(NULL);
@@ -133,13 +136,13 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
   t = 0;
 
-  printGrid(pop, n);
+  //printGrid(pop, n);
   while (ninfected >0) {
     t = t + 1;
     stream = acc_get_cuda_stream(acc_async_sync);
     #pragma acc host_data use_device(arrayRN)
     {
-        gen_rand_nums(cuda_gen, arrayRN, length*20, stream);
+        gen_rand_nums(cuda_gen, arrayRN, length, stream);
     }
     //Start Parallelization
     //Lets make the grid count in the millions so that we can actually parallelize
@@ -162,18 +165,19 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
         else {
           if (new_value == 0) {
-            rando = arrayRN[i*n+j+(t-1)*n*n];
+            rando = arrayRN[i*n+j];//+(t-1)*n*n
             //printf("%f\n", rand);
             new_value = infect(pop, i, j, tau, n, n, rando);
             if(new_value == 1){
               ninfected++;
             }
-            
           }
         }
-
+        rand3 = arrayRN[j*n+i];
+        //rand4 = arrayRN[(j+1)*(i+1)-1];
         npop[i][j] = new_value;
-
+        vaccinate(npop, i, j, rand3, nu);
+        //newPosition(npop, i, j, delta, n, rand4);
       }
 
 
@@ -189,9 +193,22 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau) {
 
       }
     }
-    printGrid(pop, n);
+    //printGrid(pop, n);
   } 
   rand_cleanup(cuda_gen);
+  int totalInfected = 0;
+  #pragma acc kernels
+    #pragma acc loop independent
+    for (i = 0; i < n; i ++) {
+      #pragma acc loop independent
+      for (j = 0; j < n; j++) {
+        if(pop[i][j] == -1){
+          totalInfected++;
+        }
+
+      }
+    }
+    printf("%d\n", totalInfected);
 }
 
 /**
@@ -251,6 +268,25 @@ bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand
     return p;
 
 }
+void newPosition(int** npop, int i, int j, float delta, int n, float rand){
+  if(delta > 0){
+    if(rand<delta){
+        int inew = floor(rand*n+1);
+        int jnew = floor(rand*n+1);
+        int tt = npop[i][j];
+        npop[i][j] = npop[inew][jnew];
+        npop[inew][jnew] = tt;
+    }
+  }
+}
+
+
+void vaccinate(int **npop, int i, int j, float rand, float nu) {
+  if (npop[i][j] == 0 && rand < nu) {
+    npop[i][j] = -2;
+  }
+}
+
 //Could be parallelizable, but if a small grid, unneccesary.
 void initialize_grid(int **grid, int n) {
   int row;
@@ -264,11 +300,11 @@ void initialize_grid(int **grid, int n) {
 }
 
 //Not Parallelizable
-void getArguments(int argc, char *argv[], int *n, int *k, float *tau) {
-  char *nvalue, *kvalue, *tvalue;
+void getArguments(int argc, char *argv[], int *n, int *k, float *tau, float *nu) {
+  char *nvalue, *kvalue, *tvalue, *vvalue;
   int c;    // result from getopt calls
 
-  while ((c = getopt(argc, argv, "n:k:t:")) != -1) {
+  while ((c = getopt(argc, argv, "n:k:t:v:")) != -1) {
     switch (c) {
       case 'n':
         nvalue = optarg;
@@ -282,9 +318,13 @@ void getArguments(int argc, char *argv[], int *n, int *k, float *tau) {
         tvalue = optarg;
         *tau = atof(tvalue);
         break;
+      case 'v':
+        vvalue = optarg;
+        *nu = atof(vvalue);
+        break;
       case '?':
       default:
-        fprintf(stderr, "Usage %s [-n dimension of grid] [-k number of days in contagion] [-t transmissablitiy rate]\n", argv[0]);
+        fprintf(stderr, "Usage %s [-n dimension of grid] [-k number of days in contagion] [-t transmissablitiy rate] [-v vaccination rate] \n", argv[0]);
         
         exit(-1);  
     }
