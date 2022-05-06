@@ -31,6 +31,7 @@
 #include "fillRand.cu"
 #include <curand.h>
 #include <time.h>
+#include <omp.h> 
 
 
 /********************************************
@@ -106,11 +107,12 @@ int main(int argc, char **argv) {
     pop[row] = (int*)malloc(n * sizeof(int));
     npop[row] = (int*)malloc(n * sizeof(int));
   }
-
+  double st = omp_get_wtime();
   initialize_grid(pop, n);
   initialize_grid(npop, n);
   spread_infection(pop, npop, n, k, tau, nu, delta);
-
+  double runtime = omp_get_wtime() - st;
+  printf("total runtime: %f\n", runtime);
   free(pop);
   free(npop);
 }
@@ -208,7 +210,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, 
 
       }
     }
-    printf("%d\n", totalInfected);
+    printf("total infected: %d\n", totalInfected);
 }
 
 /**
@@ -291,8 +293,10 @@ void vaccinate(int **npop, int i, int j, float rand, float nu) {
 void initialize_grid(int **grid, int n) {
   int row;
   int column;
-
+  #pragma acc kernels
+    #pragma acc loop independent
   for (row = 0; row < n; row ++) {
+    #pragma acc loop independent
     for (column = 0; column < n; column++) {
       grid[row][column] = 0;
     }
@@ -381,40 +385,4 @@ void printGrid(int **pop, int n) {
   printf("\n");
 }
 
-//GPU needs premade array with all random numbers for all timesteps
-//could parallelize with openMP or MPI if trng works with those.
-// float* fillRandNumArray(int n, int timesteps){
-//   trng::mt19937_64 RNengine1;
-//   trng::uniform_dist<> uni(0, 1);
-//   float *randArray;
-//   randArray = (float*) malloc(n * n * timesteps * sizeof(float));
-//   #pragma omp parallel for
-//   for(int t = 0; t<timesteps; t++){
-//     //fix i=0 j=1 is the same spot as i=1 j=0
-//     for(int i = 0; i<n; i++){
-//       for(int j = 0; j < n; j++){
-//           randArray[j+i*n+t*n*n] = uni(RNengine1);
-//       }
-//     }
-//   }
-//   // printf("%f\n", randArray[0]);
-//   // printf("%f\n", randArray[6]);
-//   // printf("%f\n", randArray[12]);
-//   //   printf("%f\n", randArray[13]);
-//   //     printf("%f\n", randArray[14]);
-//   //       printf("%f\n", randArray[15]);
-//   //         printf("%f\n", randArray[16]);
-//   //           printf("%f\n", randArray[2]);
-//   //             printf("%f\n", randArray[3]);
-//   //               printf("%f\n", randArray[4]);
-//   //                 printf("%f\n", randArray[31]);
-
-//   // printf("%f\n", randArray[18]);
-//   // printf("%f\n", randArray[24]);
-//   // printf("%f\n", randArray[25]);
-//   // printf("%f\n", randArray[26]);
-//   // printf("%f\n", randArray[40]);
-//   // printf("%f\n", randArray[70]);
-//   return randArray;
-// }
 
