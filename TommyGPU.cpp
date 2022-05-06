@@ -51,6 +51,7 @@ bool infect(int **pop, int i, int j, float tau, int nRows, int nCols, float rand
 float* fillRandNumArray(int n, int timesteps);
 void vaccinate(int **npop, int i, int j, float rand, float nu);
 void newPosition(int** npop, int i, int j, float delta, int n, float rand);
+int calcInfected(int** pop, int n);
 
 
 curandGenerator_t setup_prng(void *stream, unsigned long long seed);
@@ -116,25 +117,45 @@ int main(int argc, char **argv) {
   free(pop);
   free(npop);
 }
-//Parallelize
+
 void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, float delta) {
   int t, i, j, new_value;
-  float rando, rand3, rand4;
+  float rando, rand3;
   srand(time(0));
-  int rand1 = rand() % n;
-  int rand2 = rand() % n;
-  pop[rand1][rand2] = 1; // set first patient to infected (probably change to random nums later?
+  //infect people at the start
+  if(n > 9){
+    int i=0;
+    while(i<10){
+      int rand1 = rand() % n;
+      int rand2 = rand() % n;
+      pop[rand1][rand2] = 1;
+      i++;
+    }
+  }
+
+  int startInfected = 0;
+  //need to count because not random index might be referenced multiple times when setting initial infected
+  #pragma acc kernels
+    #pragma acc loop independent
+    for (i = 0; i < n; i ++) {
+      #pragma acc loop independent
+      for (j = 0; j < n; j++) {
+        if(pop[i][j] == 1){
+          startInfected++;
+        }
+      }
+    }
+   // set first patient to infected (probably change to random nums later?
 
   void *stream = acc_get_cuda_stream(acc_async_sync);
     int length = (n)*(n);
     curandGenerator_t cuda_gen;
-    //update constant for time loops
     float *restrict arrayRN = (float*)malloc(length*sizeof(float));
 
     // use CUDA library functions to initialize a generator
     unsigned long long seed = time(NULL);
     cuda_gen = setup_prng(stream, seed);
-  int ninfected = 1;
+  int ninfected = startInfected;
 
   t = 0;
 
@@ -152,7 +173,6 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, 
     #pragma acc loop independent
     for (i = 0; i < n; i ++) {
       #pragma acc loop independent private(new_value, i, j, rando) reduction(+:ninfected)
-      //#pragma acc data copyin(randArray)
       for (j = 0; j < n; j++) {
         new_value = pop[i][j];
         if (new_value > 0) {
@@ -168,7 +188,7 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, 
         else {
           if (new_value == 0) {
             rando = arrayRN[i*n+j];//+(t-1)*n*n
-            //printf("%f\n", rand);
+            //printf("%f\n", rando);
             new_value = infect(pop, i, j, tau, n, n, rando);
             if(new_value == 1){
               ninfected++;
@@ -198,7 +218,16 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, 
     //printGrid(pop, n);
   } 
   rand_cleanup(cuda_gen);
-  int totalInfected = 0;
+  
+  //Calculate total Infected
+  int totalInfected = calcInfected(pop, n);
+  
+    printf("total infected: %d\n", totalInfected);
+}
+//only works at the end not the start
+int calcInfected(int** pop, int n){
+  int i, j;
+  int totalInfected=0;
   #pragma acc kernels
     #pragma acc loop independent
     for (i = 0; i < n; i ++) {
@@ -207,12 +236,10 @@ void spread_infection(int **pop, int **npop, int n, int k, float tau, float nu, 
         if(pop[i][j] == -1){
           totalInfected++;
         }
-
       }
     }
-    printf("total infected: %d\n", totalInfected);
+    return totalInfected;
 }
-
 /**
 Looks at all of a current cell's neighbors and gets a random num for each
 infected neighbor and generates a random num from 0 to 1, then compares that
